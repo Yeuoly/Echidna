@@ -12,10 +12,35 @@
   "activationEvents": [],
   "main": "./out/extension.js",
   "contributes": {
+    "configuration": {
+      "title": "Echidna",
+      "properties": {
+        "echidna.OpenAIKey": {
+          "type": "string",
+          "default": "",
+          "description": "OpenAI API Key"
+        },
+        "echidna.OpenAIDefaultModel": {
+          "type": "string",
+          "default": "gpt-3.5-turbo",
+          "description": "OpenAI Default Model"
+        },
+        "echidna.OpenAIDefaultTemperature": {
+          "type": "number",
+          "default": 0.5,
+          "description": "OpenAI Default Temperature"
+        },
+        "echidna.OpenAIUrl": {
+          "type": "string",
+          "default": "https://api.openai.com/v1/chat/completions",
+          "description": "OpenAI API URL"
+        }
+      }
+    },
     "commands": [
       {
-        "command": "echidna.helloWorld",
-        "title": "Hello World"
+        "command": "echidna.summary",
+        "title": "Summary"
       }
     ],
     "viewsContainers": {
@@ -34,6 +59,14 @@
           "name": "Echidna",
           "icon": "resources/echidna.svg",
           "contextualTitle": "Echidna"
+        }
+      ]
+    },
+    "menus": {
+      "view/item/context": [
+        {
+          "command": "echidna.summary",
+          "group": "inline"
         }
       ]
     }
@@ -60,6 +93,9 @@
     "typescript": "^5.1.3"
   },
   "dependencies": {
+    "axios": "^1.6.0",
+    "chatgpt": "^5.2.5",
+    "gpt-tokenizer": "^2.1.2",
     "simple-git": "^3.20.0"
   }
 }

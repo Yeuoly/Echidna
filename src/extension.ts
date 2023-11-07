@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
-import { EchidnaDataProvider } from './container';
+import { EchidnaDataProvider } from './container'
+import { registerCommand } from './commands'
 
 
 export function activate(context: vscode.ExtensionContext) {
@@ -12,6 +13,7 @@ export function activate(context: vscode.ExtensionContext) {
 	}
 	const echidnaDataProvider = new EchidnaDataProvider(rootPath)
 	vscode.window.registerTreeDataProvider('echidna', echidnaDataProvider)
+	registerCommand(context, echidnaDataProvider, rootPath)
 }
 
 export function deactivate() {}

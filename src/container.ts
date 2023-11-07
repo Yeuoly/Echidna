@@ -3,7 +3,7 @@ import simpleGit, { SimpleGit } from 'simple-git'
 import { EchidnaUser, EchidnaUserFile, GitLogFile, gitUsers } from './helper'
 import { TreeNode } from './utils'
 
-class EchidnaElement {
+export class EchidnaElement {
     public isUser: boolean = false
     public isFile: boolean = false
     public user: EchidnaUser | undefined
