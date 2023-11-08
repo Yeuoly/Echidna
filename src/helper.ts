@@ -37,6 +37,7 @@ export class EchidnaUser {
     public deletions: number = 0
     public files: ObservableMap<string, EchidnaUserFile> = new ObservableMap<string, EchidnaUserFile>()
     public fileTree: TreeNode<string, EchidnaUserFile> = new TreeNode<string, EchidnaUserFile>('root', new EchidnaUserFile('root', 0, 0))
+    public logs: GitLog[] = []
 
     constructor(
         public name: string,
@@ -145,10 +146,14 @@ export const gitUsers = async (git: SimpleGit) => new Promise<EchidnaUser[]>(asy
     } else {
         logs.logs.forEach(log => {
             if (!users.has(log.name)) {
-                users.set(log.name, new EchidnaUser(log.name, log.email))
+                const user = new EchidnaUser(log.name, log.email)
+                users.set(log.name, user)
+                user.logs.push(log)
+                user.commits += 1
             } else {
                 const user = users.get(log.name)
                 if (user) {
+                    user.logs.push(log)
                     user.commits += 1
                     user.additions += log.additions
                     user.deletions += log.deletions
@@ -168,5 +173,23 @@ export const gitUsers = async (git: SimpleGit) => new Promise<EchidnaUser[]>(asy
             }
         })
         resolve(Array.from(users.values()))
+    }
+})
+
+export const gitUser = async (username: string) => new Promise<EchidnaUser | undefined>(async (resolve, reject) => {
+    const user = users.get(username)
+    if (user) {
+        resolve(user)
+    } else {
+        resolve(undefined)
+    }
+})
+
+export const gitUserCommits = async (username: string) => new Promise<GitLog[]>(async (resolve, reject) => {
+    const user = users.get(username)
+    if (user) {
+        resolve(user.logs)
+    } else {
+        resolve([])
     }
 })

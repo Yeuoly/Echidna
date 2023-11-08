@@ -1,11 +1,16 @@
-import { readFile, readdir, existsSync, lstat } from 'fs'
+import { readFile, readdir, existsSync, lstat, writeFile } from 'fs'
 import { join } from 'path'
 import {
     encodeChat,
-    isWithinTokenLimit,
 } from 'gpt-tokenizer'
 import { ChatMessage } from 'gpt-tokenizer/esm/GptEncoding'
 import { chat } from './chat'
+import { 
+    getRepositorySummaryCache, writeRepositorySummaryCache,
+    writeRepositoryUserSummary, getRepositoryUserSummary
+} from './cache'
+import { findLanguage } from './utils'
+import { GitLog } from './helper'
 
 /**
  * summarizeRepository summarizes a git repository.
@@ -21,6 +26,12 @@ import { chat } from './chat'
 export const summarizeRepository = (
     repository: string
 ) => new Promise<string>(async (resolve) => {
+    // check cache
+    const cache = await getRepositorySummaryCache(repository)
+    if (cache && cache.length > 0) {
+        resolve(cache)
+        return
+    }
     // try to find readme
     const readme = await new Promise<string>(resolve => {
         readdir(repository, (err, files) => {
@@ -90,7 +101,10 @@ The text should include what problem this repository addresses, its intended use
                 resolve(summary)
             })
 
-            const summaries = await Promise.all(messages.map(summarizeReadme))
+            const summaries = []
+            for (const message of messages) {
+                summaries.push(await summarizeReadme(message))
+            }
             // summarize summary
             const summarizeSummary = (summary: string) => new Promise<string>(async resolve => {
                 resolve(await chat(systemPrompt, summary))
@@ -113,290 +127,125 @@ Top languages: ${languages.join(', ')}.
 ${summary}
     `
 
+    // write cache
+    await writeRepositorySummaryCache(repository, finalSummary)
     resolve(finalSummary)
 })
 
-const findLanguage = (repository: string) => new Promise<string[]>(resolve => {
-    const languages = []
-    // find top 3 languages
-    let phps = 0
-    let pys = 0
-    let javas = 0
-    let cpps = 0
-    let jss = 0
-    let gos = 0
-    let rusts = 0
-    let rubys = 0
-    let csharps = 0
-    let swifts = 0
-    let cs = 0
-    let shells = 0
-    let htmls = 0
-    let mds = 0
-
-    const files: string[] = []
-    const walk = (dir: string) => {
-        readdir(dir, (err, files) => {
-            if (err) {
-                return
-            }
-            for (const file of files) {
-                lstat(join(dir, file), (err, stat) => {
-                    if (err) {
-                        return
-                    }
-                    if (stat.isDirectory()) {
-                        walk(join(dir, file))
-                    } else {
-                        files.push(join(dir, file))
-                    }
-                })
-            }
-        })
+/**
+ * summarizeRepositoryUser summarizes a user's contributions to a repository.
+ * @param repository 
+ * @param user 
+ * @returns 
+ */
+export const summarizeRepositoryUser = (repository: string, user: string, commits: GitLog[]) => new Promise<string>(async (resolve) => {
+    // check cache
+    const cache = await getRepositoryUserSummary(repository, user)
+    if (cache && cache.length > 0) {
+        resolve(cache)
+        return
     }
-    walk(repository)
 
-    // check if Python, based on requirements.txt, setup.py, etc.
-    const python = function(){
-        if (existsSync(join(repository, 'requirements.txt'))) {
-            return true
-        }
-        if (existsSync(join(repository, 'setup.py'))) {
-            return true
-        }
-        for (const file of files) {
-            if (file.endsWith('.py')) {
-                pys++
-            }
-        }
-    }()
+    const repositorySummary = await summarizeRepository(repository)
+    const systemPrompt = `You are an experienced software architect tasked with summarizing and evaluating the contributions of an individual within a Git repository.
+Your summary should include their primary areas of focus, the extent of their contributions to this repository, and the potential impact on their career progression.
+This is a crucial assessment.
 
-    // check if Java, based on pom.xml, etc.
-    const java = function(){
-        if (existsSync(join(repository, 'pom.xml'))) {
-            return true
-        }
-        for (const file of files) {
-            if (file.endsWith('.java')) {
-                javas++
-            }
-        }
-    }()
+You will be given a summary of the repository and a list of commits by the user. do not describe the commits, but summarize them.
+What's more, the summary should be useful for the third party to understand the user's contributions to the repository.
 
-    // check if C++, based on CMakeLists.txt, etc.
-    const cpp = function(){
-        if (existsSync(join(repository, 'CMakeLists.txt'))) {
-            return true
-        }
-        if (existsSync(join(repository, 'Makefile'))) {
-            return true
-        }
-        if (existsSync(join(repository, 'Makefile.am'))) {
-            return true
-        }
-        for (const file of files) {
-            if (file.endsWith('.cpp')) {
-                cpps++
-            } else if (file.endsWith('.h')) {
-                cpps++
-            } else if (file.endsWith('.hpp')) {
-                cpps++
-            }
-        }
-    }()
-
-    // check if JavaScript, based on package.json, etc.
-    const javascript = function(){
-        if (existsSync(join(repository, 'package.json'))) {
-            return true
-        }
-        for (const file of files) {
-            if (file.endsWith('.js')) {
-                jss++
-            } else if (file.endsWith('.jsx')) {
-                jss++
-            } else if (file.endsWith('.ts')) {
-                jss++
-            }
-        }
-    }()
-
-    // check if Go, based on go.mod, etc.
-    const go = function(){
-        if (existsSync(join(repository, 'go.mod'))) {
-            return true
-        }
-        for (const file of files) {
-            if (file.endsWith('.go')) {
-                gos++
-            }
-        }
-    }()
-
-    // check if Rust, based on Cargo.toml, etc.
-    const rust = function(){
-        if (existsSync(join(repository, 'Cargo.toml'))) {
-            return true
-        }
-        for (const file of files) {
-            if (file.endsWith('.rs')) {
-                rusts++
-            }
-        }
-    }()
-
-    // check if PHP, based on composer.json, etc.
-    const php = function(){
-        if (existsSync(join(repository, 'composer.json'))) {
-            return true
-        }
-        for (const file of files) {
-            if (file.endsWith('.php')) {
-                phps++
-            }
-        }
-    }()
-
-    // check if Ruby, based on Gemfile, etc.
-    const ruby = function(){
-        if (existsSync(join(repository, 'Gemfile'))) {
-            return true
-        }
-        for (const file of files) {
-            if (file.endsWith('.rb')) {
-                rubys++
-            }
-        }
-    }()
-
-    // check if C#, based on .csproj, etc.
-    const csharp = function(){
-        if (existsSync(join(repository, '.csproj'))) {
-            return true
-        }
-        for (const file of files) {
-            if (file.endsWith('.cs')) {
-                csharps++
-            }
-        }
-    }()
-
-    // check if C, based on Makefile, etc.
-    const c = function(){
-        if (existsSync(join(repository, 'Makefile'))) {
-            return true
-        }
-        if (existsSync(join(repository, 'Makefile.am'))) {
-            return true
-        }
-        for (const file of files) {
-            if (file.endsWith('.c')) {
-                cs++
-            }
-        }
-    }()
-
-    // check if Swift, based on Package.swift, etc.
-    const swift = function(){
-        if (existsSync(join(repository, 'Package.swift'))) {
-            return true
-        }
-        for (const file of files) {
-            if (file.endsWith('.swift')) {
-                swifts++
-            }
-        }
-    }()
-
-    // check if Shell, based on .sh, etc.
-    const shell = function(){
-        for (const file of files) {
-            if (file.endsWith('.sh')) {
-                shells++
-            } else if (file.endsWith('.bash')) {
-                shells++
-            } else if (file.endsWith('.zsh')) {
-                shells++
-            } else if (file.endsWith('.fish')) {
-                shells++
-            }
-        }
-    }()
-
-    // check if HTML, based on .html, etc.
-    const html = function(){
-        for (const file of files) {
-            if (file.endsWith('.html')) {
-                htmls++
-            }
-        }
-    }()
-
-    // check if Markdown, based on .md, etc.
-    const md = function(){
-        for (const file of files) {
-            if (file.endsWith('.md')) {
-                mds++
-            }
-        }
-    }()
-
-    // return top 3 languages
-    const rank = [
-        ['Python', pys],
-        ['Java', javas],
-        ['C++', cpps],
-        ['JavaScript', jss],
-        ['Go', gos],
-        ['Rust', rusts],
-        ['PHP', phps],
-        ['Ruby', rubys],
-        ['C#', csharps],
-        ['C', cs],
-        ['Shell', shells],
-        ['HTML', htmls],
-        ['Markdown', mds],
-        ['Swift', swifts],
-    ].sort((a, b) => b[1] as number - (a[1] as number))
-    for (const r of rank) {
-        if (r[1] as number > 0) {
-            languages.push(r[0] as string)
+Here is the summary of the repository:
+${repositorySummary}
+    `
+    // merge commits to messages
+    const messages: string[] = []
+    let index = 0
+    for (let i = 1; i <= commits.length; i++) {
+        const commit = commits.slice(index, i).map(c => `${c.date} - ${c.message}`).join('\n')
+        const chatWithinTokenLimit = encodeChat([{
+            role: 'system',
+            content: systemPrompt
+        }, {
+            role: 'user',
+            content: commit
+        }], 'gpt-3.5-turbo')
+        if (chatWithinTokenLimit.length > 3000) {
+            messages.push(commits.slice(index, i - 1).map(c => `${c.date} - ${c.message}`).join('\n'))
+            index = i - 1
         }
     }
 
-    if (python && !languages.includes('Python')) {
-        languages.push('Python')
-    }
-    if (java && !languages.includes('Java')) {
-        languages.push('Java')
-    }
-    if (cpp && !languages.includes('C++')) {
-        languages.push('C++')
-    }
-    if (javascript && !languages.includes('JavaScript')) {
-        languages.push('JavaScript')
-    }
-    if (go && !languages.includes('Go')) {
-        languages.push('Go')
-    }
-    if (rust && !languages.includes('Rust')) {
-        languages.push('Rust')
-    }
-    if (php && !languages.includes('PHP')) {
-        languages.push('PHP')
-    }
-    if (ruby && !languages.includes('Ruby')) {
-        languages.push('Ruby')
-    }
-    if (csharp && !languages.includes('C#')) {
-        languages.push('C#')
-    }
-    if (c && !languages.includes('C')) {
-        languages.push('C')
-    }
-    if (swift && !languages.includes('Swift')) {
-        languages.push('Swift')
+    // merge last
+    if (index < commits.length) {
+        messages.push(commits.slice(index).map(c => `${c.date} - ${c.message}`).join('\n'))
     }
 
-    resolve(languages)
+    // summarize each commit
+    const summarizeCommit = (commit: string) => new Promise<string>(async resolve => {
+        const summary = await chat(systemPrompt, commit)
+        resolve(summary)
+    })
+
+    const summaries = []
+    for (const message of messages) {
+        summaries.push(await summarizeCommit(message))
+    }
+    // summarize summary
+    const systemPrompt2 = `You are an experienced software architect tasked with summarizing and evaluating the contributions of an individual within a Git repository.
+Your summary should include their primary areas of focus, the extent of their contributions to this repository, and the potential impact on his career progression.
+This is a crucial assessment.
+
+You will be given a summary of the repository and a list of partial summaries of the commits by the user. do not describe the commits, but summarize them.
+What's more, the summary should be useful for the third party to understand the user's contributions to the repository.
+
+Here is the summary of the repository:
+${repositorySummary}
+`
+
+    const summarizeSummary = (summary: string) => new Promise<string>(async resolve => {
+        resolve(await chat(systemPrompt2, summary))
+    })
+
+    const summarizePartialSummary = (summaries: string[]) => new Promise<string[]>(async resolve => {
+        // cause we are using gpt-3.5-turbo, we can only summarize 4097 tokens at a time, but we choose 3000 to be safe
+        // we should recursively summarize until we reach the limit
+        const messages: string[] = []
+        let index = 0
+        for (let i = 1; i <= summaries.length; i++) {
+            const commit = summaries.slice(index, i).join('\n')
+            const chatWithinTokenLimit = encodeChat([{
+                role: 'system',
+                content: systemPrompt2
+            }, {
+                role: 'user',
+                content: commit
+            }], 'gpt-3.5-turbo')
+            if (chatWithinTokenLimit.length > 3000) {
+                messages.push(summaries.slice(index, i - 1).join('\n'))
+                index = i - 1
+            }
+        }
+        // merge last
+        if (index < summaries.length) {
+            messages.push(summaries.slice(index).join('\n'))
+        }
+
+        // summarize each summary
+        const newSummaries = []
+        for (const message of messages) {
+            newSummaries.push(await summarizeSummary(message))
+        }
+
+        // check if we need to summarize again
+        if (newSummaries.length > 1) {
+            resolve(await summarizePartialSummary(newSummaries))
+        } else {
+            resolve(newSummaries)
+        }
+    })
+
+    const finalSummary = await summarizePartialSummary(summaries)
+    // write cache
+    await writeRepositoryUserSummary(repository, user, finalSummary[0])
+    resolve(finalSummary[0])
 })
