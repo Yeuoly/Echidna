@@ -1,8 +1,6 @@
 import * as vscode from 'vscode'
 
-const config = vscode.workspace.getConfiguration('echidna')
-
-export const configGetOpenAIUrl = () => config.get('OpenAIUrl') as string
-export const configGetOpenAIKey = () => config.get('OpenAIKey') as string
-export const configGetOpenAIDefaultModel = () => config.get('OpenAIDefaultModel') as string
-export const configGetOpenAIDefaultTemperature = () => config.get('OpenAIDefaultTemperature') as number
+export const configGetOpenAIUrl = () => vscode.workspace.getConfiguration('echidna').get('OpenAIUrl') as string
+export const configGetOpenAIKey = () => vscode.workspace.getConfiguration('echidna').get('OpenAIKey') as string
+export const configGetOpenAIDefaultModel = () => vscode.workspace.getConfiguration('echidna').get('OpenAIDefaultModel') as string
+export const configGetOpenAIDefaultTemperature = () => vscode.workspace.getConfiguration('echidna').get('OpenAIDefaultTemperature') as number

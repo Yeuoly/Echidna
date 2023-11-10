@@ -44,6 +44,6 @@ export const chat = (
         })
         resolve(result.data.choices[0].message.content)
     } catch (e) {
-        console.log(e)
+        throw new Error(`OpenAI API error: ${e}`)
     }
 })

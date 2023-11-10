@@ -1,5 +1,6 @@
 import { SimpleGit } from "simple-git"
 import { ObservableMap, TreeNode } from "./utils"
+import { getRepositoryUserCommits } from "./cache"
 
 export class GitLogFile {
     constructor(
@@ -83,7 +84,7 @@ export const gitLog = async (git: SimpleGit) => new Promise<{
     if (logs.length > 0) {
         // check if logs is latest
         let isLatest = true
-        git.log({maxCount: 1}, (err, log) => {
+        git.log({ maxCount: 1 }, (err, log) => {
             console.log(log)
         })
 
@@ -98,7 +99,7 @@ export const gitLog = async (git: SimpleGit) => new Promise<{
 
     const latest_logs: GitLog[] = [];
     // list all logs, including username, email, date, message, hash, isMerge, additions, deletions, files
-    git.raw(['log', '--pretty="%h-##-%an-##-%ae-##-%ad-##-%s"', '--numstat']).then(log => {
+    git.raw(['log', '--pretty="%H-##-%an-##-%ae-##-%ad-##-%s"', '--numstat']).then(log => {
         log.split('\n').forEach(line => {
             if (line.startsWith('"')) {
                 const commit = line.replace(/"/g, '').split('-##-')
@@ -185,11 +186,58 @@ export const gitUser = async (username: string) => new Promise<EchidnaUser | und
     }
 })
 
-export const gitUserCommits = async (username: string) => new Promise<GitLog[]>(async (resolve, reject) => {
+export const gitUserCommits = async (repository: string, username: string) => new Promise<GitLog[]>(async (resolve, reject) => {
     const user = users.get(username)
     if (user) {
+        // get cache commits
+        const commits = await getRepositoryUserCommits(repository, user.name)
+        for (const log of user.logs) {
+            if (log.hash in commits) {
+                log.message = commits[log.hash]
+            }
+        }
         resolve(user.logs)
     } else {
         resolve([])
     }
+})
+
+export const todayUserCommits = async (repository: string, username: string) => new Promise<GitLog[]>(async (resolve, reject) => {
+    const logs = await gitUserCommits(repository, username)
+    const today = new Date()
+    const today_logs: GitLog[] = []
+    for (const log of logs) {
+        if (log.date.getFullYear() === today.getFullYear() &&
+            log.date.getMonth() === today.getMonth() &&
+            log.date.getDate() === today.getDate()) {
+            today_logs.push(log)
+        }
+    }
+
+    resolve(today_logs)
+})
+
+/**
+ * checkCommits checks if there is any commits which leak of enough information to summarize.
+ */
+export const checkCommits = async (repository: string, username: string) => new Promise<string[]>(async (resolve, reject) => {
+    const logs = await gitUserCommits(repository, username)
+
+    const leaks: string[] = []
+    for (const log of logs) {
+        if (log.message.split(/[\s,;:\"\']/g).length < 2) {
+            leaks.push(log.hash)
+        }
+    }
+    resolve(leaks)
+})
+
+export const getDiff = async (git: SimpleGit, hash: string) => new Promise<string>(async (resolve, reject) => {
+    git.diff([`${hash}^..${hash}`], (err, diff) => {
+        if (err) {
+            resolve('')
+        } else {
+            resolve(diff)
+        }
+    })
 })

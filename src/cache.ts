@@ -1,6 +1,10 @@
-import { readFile, readdir, existsSync, lstat, writeFile, mkdir } from 'fs'
+import { readFile, readdir, existsSync, lstat, writeFile, mkdir, mkdirSync } from 'fs'
 import { join } from 'path'
 import { gitUser } from './helper'
+
+/**
+ * Created by: Github Copilot
+ */
 
 // create .vscode
 const createVscode = (repository: string) => new Promise<void>(resolve => {
@@ -156,6 +160,106 @@ export const getRepositoryUserSummary = (repository: string, user: string) => ne
                 return
             }
             resolve(json.userSummary[user] || '')
+        })
+    } else {
+        resolve('')
+    }
+})
+
+export const getRepositoryUserCommits = (repository: string, user: string) => new Promise<{
+    [commit: string]: string
+}>(async resolve => {
+    await createVscode(repository)
+    // read .vscode/echidna.json
+    // if exists, return the summary
+    const echidnaJson = join(repository, '.vscode/echidna.json')
+    if (existsSync(echidnaJson)) {
+        readFile(echidnaJson, (err, data) => {
+            if (err) {
+                resolve({})
+                return
+            }
+            const json = JSON.parse(data.toString())
+            if (json.userCommits === undefined) {
+                resolve({})
+                return
+            }
+            resolve(json.userCommits[user] || {})
+        })
+    } else {
+        resolve({})
+    }
+})
+
+export const writeRepositoryUserCommits = (repository: string, user: string, commits: {
+    [commit: string]: string
+}) => new Promise<void>(async resolve => {
+    await createVscode(repository)
+    // write .vscode/echidna.json
+    // if exists, return the summary
+    const echidnaJson = join(repository, '.vscode/echidna.json')
+    if (existsSync(echidnaJson)) {
+        readFile(echidnaJson, (err, data) => {
+            if (err) {
+                writeFile(echidnaJson, JSON.stringify({
+                    userCommits: {
+                        [user]: commits
+                    }
+                }), () => {
+                    resolve()
+                })
+            } else {
+                const json = JSON.parse(data.toString())
+                if (json.userCommits === undefined) {
+                    json.userCommits = {}
+                }
+                json.userCommits[user] = commits
+                writeFile(echidnaJson, JSON.stringify(json), () => {
+                    resolve()
+                })
+            }
+        })
+    } else {
+        writeFile(echidnaJson, JSON.stringify({
+            userCommits: {
+                [user]: commits
+            }
+        }), () => {
+            resolve()
+        })
+    }
+})
+
+export const writeRepositoryUserDailyReport = (repository: string, user: string, timestamp: string, report: string) => new Promise<void>(async resolve => {
+    await createVscode(repository)
+    // write .vscode/user/dailyReport/timestamp.md
+    // create dirs
+    const userDir = join(repository, `.vscode/${user}`)
+    if (!existsSync(userDir)) {
+        mkdirSync(userDir)
+    }
+    const dailyReportDir = join(repository, `.vscode/${user}/dailyReport`)
+    if (!existsSync(dailyReportDir)) {
+        mkdirSync(dailyReportDir)
+    }
+
+    const dailyReportFile = join(repository, `.vscode/${user}/dailyReport/${timestamp}.md`)
+    writeFile(dailyReportFile, report, () => {
+        resolve()
+    })
+})
+
+export const getRepositoryUserDailyReport = (repository: string, user: string, timestamp: string) => new Promise<string>(async resolve => {
+    await createVscode(repository)
+    // read .vscode/user/dailyReport/timestamp.md
+    const dailyReportFile = join(repository, `.vscode/${user}/dailyReport/${timestamp}.md`)
+    if (existsSync(dailyReportFile)) {
+        readFile(dailyReportFile, (err, data) => {
+            if (err) {
+                resolve('')
+                return
+            }
+            resolve(data.toString())
         })
     } else {
         resolve('')

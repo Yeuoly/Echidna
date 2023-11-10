@@ -22,7 +22,7 @@
         },
         "echidna.OpenAIDefaultModel": {
           "type": "string",
-          "default": "gpt-3.5-turbo",
+          "default": "gpt-3.5-turbo-1106",
           "description": "OpenAI Default Model"
         },
         "echidna.OpenAIDefaultTemperature": {
@@ -41,6 +41,10 @@
       {
         "command": "echidna.summary",
         "title": "Summary"
+      },
+      {
+        "command": "echidna.report",
+        "title": "Report"
       }
     ],
     "viewsContainers": {
@@ -67,6 +71,10 @@
         {
           "command": "echidna.summary",
           "group": "inline"
+        },
+        {
+          "command": "echidna.report",
+          "group": "inline"
         }
       ]
     }
@@ -77,7 +85,8 @@
     "watch": "tsc -watch -p ./",
     "pretest": "pnpm run compile && pnpm run lint",
     "lint": "eslint src --ext ts",
-    "test": "node ./out/test/runTest.js"
+    "test": "node ./out/test/runTest.js",
+    "package": "pnpm vsce package --no-dependencies"
   },
   "devDependencies": {
     "@types/glob": "^8.1.0",

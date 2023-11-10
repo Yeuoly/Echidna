@@ -20,9 +20,11 @@ export class EchidnaElement {
 }
 
 export class EchidnaDataProvider implements vscode.TreeDataProvider<EchidnaElement> {
-    private git: SimpleGit
+    public git: SimpleGit
+    public workspace: string
 
     constructor(workspace: string) {
+        this.workspace = workspace
         this.git = simpleGit(workspace)
     }
 

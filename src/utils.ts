@@ -1,42 +1,43 @@
-import { existsSync, lstat, readdir } from "fs";
-import { join } from "path";
+import { existsSync, lstat, readFile, readdir } from "fs"
+import { join, resolve } from "path"
+import * as vscode from "vscode"
 
 export class ObservableMap<K, V> extends Map<K, V> {
-    private onAddListeners: Map<string, (key: K, value: V) => void> = new Map();
+    private onAddListeners: Map<string, (key: K, value: V) => void> = new Map()
     
     addOnAddListener(listenerName: string, listener: (key: K, value: V) => void) {
-        this.onAddListeners.set(listenerName, listener);
+        this.onAddListeners.set(listenerName, listener)
     }
     
     removeOnAddListener(listenerName: string) {
-        this.onAddListeners.delete(listenerName);
+        this.onAddListeners.delete(listenerName)
     }
     
     set(key: K, value: V) {
-        super.set(key, value);
+        super.set(key, value)
         this.onAddListeners.forEach((listener) => {
-            listener(key, value);
-        });
-        return this;
+            listener(key, value)
+        })
+        return this
     }
 }
 
 export class TreeNode<K, T> {
-    key: K;
-    value: T;
-    children: TreeNode<K, T>[] = [];
+    key: K
+    value: T
+    children: TreeNode<K, T>[] = []
 
     constructor(key: K, value: T) {
-        this.key = key;
-        this.value = value;
+        this.key = key
+        this.value = value
     }
 
     public addChild(child: TreeNode<K, T>) {
-        this.children.push(child);
+        this.children.push(child)
     }
 
     public hasChild(key: K) {
-        return this.children.find(child => child.key === key) !== undefined;
+        return this.children.find(child => child.key === key) !== undefined
     }
 }
 
@@ -324,3 +325,55 @@ export const findLanguage = (repository: string) => new Promise<string[]>(resolv
 
     resolve(languages)
 })
+
+export const getReadme = (repository: string) => new Promise<string>(async resolve => {
+    const readme = await new Promise<string>(resolve => {
+        readdir(repository, (err, files) => {
+            if (err) {
+                resolve('')
+                return
+            }
+            for (const file of files) {
+                if (file.toLowerCase().startsWith('readme') && file.endsWith('.md')) {
+                    readFile(`${repository}/${file}`, (err, data) => {
+                        if (err) {
+                            resolve('')
+                            return
+                        }
+                        resolve(data.toString())
+                    })
+                    return
+                }
+            }
+            resolve('')
+        })
+    })
+    resolve(readme)
+})
+
+export const withLoading = (context: (feedback: (progress: number, message?: string) => void) => Promise<any>) => new Promise<void>(async resolve => {
+    await vscode.window.withProgress({
+        location: vscode.ProgressLocation.Notification,
+        title: 'Echidna',
+        cancellable: false
+    }, async (progress, token) => {
+        token.onCancellationRequested(() => {
+            console.log("User canceled the long running operation")
+        })
+
+        const feedback = (_progress: number, message?: string) => {
+            progress.report({ increment: _progress, message: message })
+        }
+
+        await context(feedback)
+        resolve()
+    })
+})
+
+export const errorMessageEvent = (message: string) => {
+    vscode.window.showErrorMessage(message)
+}
+
+export const infoMessageEvent = (message: string) => {
+    vscode.window.showInformationMessage(message)
+}
