@@ -11,6 +11,7 @@ export function activate(context: vscode.ExtensionContext) {
 	if (!rootPath) {
 		return
 	}
+	vscode.window.showInformationMessage('Echidna is now active!')
 	const echidnaDataProvider = new EchidnaDataProvider(rootPath)
 	vscode.window.registerTreeDataProvider('echidna', echidnaDataProvider)
 	registerCommand(context, echidnaDataProvider, rootPath)

@@ -6,11 +6,16 @@
   "engines": {
     "vscode": "^1.84.0"
   },
+  "publisher": "YeuolyPo",
   "categories": [
     "Other"
   ],
   "activationEvents": [],
   "main": "./out/extension.js",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Yeuoly/Echidna"
+  },
   "contributes": {
     "configuration": {
       "title": "Echidna",

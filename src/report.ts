@@ -1,5 +1,5 @@
 import { encodeChat } from "gpt-tokenizer"
-import { getRepositoryUserDailyReport, getRepositoryUserSummary, writeRepositoryUserDailyReport } from "./cache"
+import { getRepositorySummaryCache, getRepositoryUserDailyReport, getRepositoryUserSummary, writeRepositoryUserDailyReport } from "./cache"
 import { GitLog, getDiff } from "./helper"
 import { summarizeRepository } from "./summarize"
 import { errorMessageEvent } from "./utils"
@@ -37,7 +37,7 @@ export const writeDailyReport = (
             return
         }
 
-        const repositorySummary = await getRepositoryUserSummary(repository, user)
+        const repositorySummary = await summarizeRepository(repository)
 
         let diff = ''
         // get diff
